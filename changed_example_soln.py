@@ -1,7 +1,7 @@
 ## copied from iprg2016_two_peptide_rule.ipyn
 
 
-### all imports copied here
+### all imports copied here.
 
 import subprocess
 import glob
@@ -11,7 +11,10 @@ import csv
 
 
 
-### in [1]
+### in [1]. This is just parsing the fasta file. We will call this function in [8] below. 
+
+## VARIABLES HERE: fastaFile- is the fasta file, specified in [5]
+########### proteinNames - the names of each protein (ex: HPRR1950679)
 def getAllProteinNames(fastaFile):
     proteinNames = []
     with open(fastaFile,"r") as lines:
@@ -26,7 +29,21 @@ def getAllProteinNames(fastaFile):
 #import csv
 
 
-## in [2]
+
+
+
+
+
+## in [2]. This is the two peptide rule. We call this function in [3] below.
+
+## VARIABLES HERE: fileName = the name of the file in the percolator output files. Specified in [5] EX: for me it is study_package/mz_ml_files/A1-output/percolator.target.peptides.txt.
+###### isDecoy = either True or False depending on if its A1-output/percolator.decoy.peptides.txt or percolator.target.peptides.txt. 
+###### proteinList = a list of 3 items. A score from percolator (NOT the Q val, something else but idk what, it's a column made in the percolator.target.peptides.txt), either True or False depending on if it is the decoy file, and the protein name...
+#### ... so the total output looks like :('-0.65778631', True, 'CAQ31710'), ('0.17604649', True, 'HPRR4000237'), ('-0.37825835', True, 'HPRR3780010') etc.
+
+## so this we will replace with the parsimony. I THINK the only thing we need to change is the FDR, otherwise they act the same (ie. both take as input only one file, either the target or the decoy)...
+## ... and it will need to have the same output, proteinList (explained above)
+## I will explain in [8] how they loop through the percolator.target and percolator.decoy files to get these outputs. 
 def parsePeptieFileUsingTwoPeptidesRule(fileName, isDecoy):
     with open(fileName, "r") as fileIter:
         tabReader = csv.reader(fileIter,doublequote = False, delimiter = '\t')
@@ -52,7 +69,20 @@ def parsePeptieFileUsingTwoPeptidesRule(fileName, isDecoy):
     return proteinList
 
 
-##in [3]
+
+
+
+
+### ok so here we take the decoy and the target files from each pool (A1, A2, etc). 
+### VARIABLES: proteins, is the output from parsePeptieFileUsingTwoPeptidesRule(therefore proteinList).
+############ fdr = this is the number of decoys divided by the number of targets. IF i understand this correctly, it is recalculated at each line as it loops through "proteins" ...
+############ ... i.e. proteinList. You also add this value so it is paired to the protein name under the output, protFdrDict. One also can indicate the threshold for the fdr and the script will report ...
+############ ... back a number of proteins found at that FDR. 
+############ protFdrDict = This is a dictionary in python, which is essentially a list of values that are paired to each other. Here, the paired values are the protein names and the fdr for that protein....
+########### ... example:   'CAQ33735': 0.0,   'CAQ33734': 0.16252390057361377,    'HPRR4340063': 0.3311897106109325,    'HPRR1450141': 0.0,    
+############ order and q are protein names and some number in the function, I don't totally understand their purpose. I'm thinking something about a q value threshold.
+
+##in [3]. Will call this in 8 below but we should also change this to take away the FDR part and also adapt it to the parsimony. 
 def getProteinWithFDR(targetFile,decoyFile):
     proteins = parsePeptieFileUsingTwoPeptidesRule(targetFile,False)
     proteins += parsePeptieFileUsingTwoPeptidesRule(decoyFile,True)
@@ -80,9 +110,14 @@ def getProteinWithFDR(targetFile,decoyFile):
         protFdrDict[prot] = q
     return protFdrDict
 
-##in [5]
+## skip in [4] because it was converting to mzml format. Already done.
+
+
+### in [5] the script is just looking in your directory that you are running the script from to see where the mzml files are. In my directory ...
+### ... they are in a subdirectory called mz_ml_files so that is why I specify that here. If you want to run this in your own computer, make sure that you change this name to the name of the directory where your mzml files are stored. 
+
 fastaFile = "iPRG2016.fasta"  
-spec_files = glob.glob("*.mzML")
+spec_files = glob.glob("mz_ml_files/*.mzML")
 setNames=[os.path.splitext(fileName)[0] for fileName in spec_files]
 
 print spec_files, fastaFile
@@ -90,7 +125,8 @@ print spec_files, fastaFile
 
 
 
-## in [6]
+## in [6]. This requires that crux is installed and also in your path of executable files. For this, I write " export PATH=$PATH:crux-3.0.Darwin.i386/bin " in the command ...
+### ... line each time I open a terminal. If you want it to be automatic, add it to your ~/.bashrc . I have crux in the same directory as this script but I don't think it's necessary to do that.
 
 
 subprocess.call(["crux", "tide-index", 
@@ -105,8 +141,9 @@ for setN in setNames:
 
 
 
+## in [7]. Here we call percolator, also from crux. At this point we have several subdirectories that will be spit out from crux output. I think it is "prest-index", "crux-output", and "mz_ml_files/*_output" 
+##So far we are only working with the mz_ml_files output (or whatever you named your directory with the mzml files in it).
 
-## in [7]
 for setN in setNames:
     print "Post processing %s\'s results."%(setN)
     options = "--output-dir %s-output --overwrite T" % setN  
@@ -119,13 +156,25 @@ for setN in setNames:
 
 
 
-## in [8]
+## in [8]    as it says below in the comment, only report back prEST frags from the fasta file. This is where you call the function from [1]
 proteinRunDict = dict()
 for prot in getAllProteinNames(fastaFile):
     # Only report the PrEST sequences
     if prot[:4]=='HPRR':
         proteinRunDict[prot] = []
 
+#proteinRunDict is all the prest frags from the fasta file. Not to be confused with protFdrDict. 
+
+
+#### Ok so here is where the functions in [2] and [3] are called. the function parsePeptieFileUsingTwoPeptidesRule is called in getProteinWithFDR so that's why we don't see it below
+#### This will loop through the files A1, A2, A3, B1, B2.... etc -output/percolator. I.e. setN will be A1 , and then when it loops through this for loop again it will be A2, then A3, etc. 
+#### It then calls the function getProteinWithFDR and specifies that we only want A1-output/percolator.target(or .decoy).peptides.txt. None of the other things in A1-output.
+
+##### VARIABLES: protFdrDict = the output of getProteinWithFDR, which was the protein and the fdr number (HPRR1951262': 0.6462459695992631)
+##### proteinRunDict comes from the part above, it is the prEST fragment names. Now what this part of the script will do is see if the fragment was also in the protFdrDict, and 
+##### if it is, assign the fdr number that was already attached to it (i.e if you use the example above, HPRR1951262 it will get the number 0.6462459695992631)
+###### if it is NOT, give it the fdr number of 1. So this means our assumption before of the 0's and the 1's in the result file is backwards. A value of 0 means it's there, a value of 1 means ...
+###### ... that is is not there, or that the fdr is 100% 
 for setN in setNames:
     print "Parsing %s\'s results."%(setN)
     protFdrDict = getProteinWithFDR("%s-output/percolator.target.peptides.txt"%(setN),
@@ -137,12 +186,12 @@ for setN in setNames:
             fdr = float(1.0)
         proteinRunDict[prot].append(fdr)
 
+#### so in parsimony we should be able to just add this part on, leave this part with the fdr equalling 1 if the value is not in the fasta file 
 
 
 
 
-
-## in [9]
+## in [9]. Just write the results and add a description row on top 
 
 
 with open("my_resultFile.txt","w") as outFile:
@@ -151,5 +200,4 @@ with open("my_resultFile.txt","w") as outFile:
     for prot in proteinRunDict:
         csvWriter.writerow([prot]+proteinRunDict[prot])
     outFile.close()
-
 
