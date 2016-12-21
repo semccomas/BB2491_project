@@ -3,10 +3,8 @@
 # parsimony.py - takes percolator xml output file and outputs parsimonous
 #                protein identifications with peptide matches
 #
-# Author: Yrin Eldfjell
-# Version: 20140318.1
 
-#from lxml import etree
+
 from pygraph.classes.graph import graph
 from pygraph.algorithms.accessibility import connected_components
 from itertools import combinations, chain
@@ -22,31 +20,36 @@ import sys
 # <protein name>\t<peptide 1>\t...\t<peptide N>
 
 
+fastaFile = "iPRG2016.fasta"  
+
+### so now this will parse the file the same way as the two peptide rule. Filename here is sys. This should be changed to be in [8] as setN and the %s thing. This is the ...
+### ... first part of the parsePeptideFileUsingTwoPeptideRule function (attributing values to variables and reading the file). 
+### VARIABLES: peptides. A dictionary of the sequence attached to the protein name for each file. I think maybe later we will change this to the q value score so that it is matching ...
+### .. the script with two peptide rule. 
+
 def parse_percolator_txt(filename, q_value_cutoff= 0.01):
-    ## changing this to try to get the same output but with txt file
-    with open(filename, 'r') as f:
-        f= f.read().splitlines()
-        peptides= {}
-        for line in f[1:]:
-            line = line.split('\t')
-            q_value_str = line[9]
-            pep_seq = line[11]
-            protein_str = line[13]
-            try:
-                q_value = float(q_value_str)
-            except ValueError:
-                raise ValueError("Invalid q value {}".format(q_value_str))
-            if pep_seq in peptides:
-                raise RuntimeError("Duplicate peptide in percolator xml output")
-            if q_value > q_value_cutoff:
-                continue
-            protein_ids = protein_str.split(',')
-            peptides[pep_seq] = protein_ids
-        return peptides
+    f = open(filename).read().splitlines()
+    peptides= {}
+    for line in f[1:]:
+        line = line.split('\t')
+        q_value_str = line[9]
+        pep_seq = line[11]
+        protein_str = line[13]
+        try:
+            q_value = float(q_value_str)
+        except ValueError:
+            raise ValueError("Invalid q value {}".format(q_value_str))
+        if pep_seq in peptides:
+            raise RuntimeError("Duplicate peptide in percolator xml output")
+        if q_value > q_value_cutoff:
+            pass # i have NO idea why but when continue is here, it does not get along with the decoy sets. Dont change this or nothing will work for decoy
+        protein_ids = protein_str.split(',')
+        peptides[pep_seq] = protein_ids
+    return peptides
 
 
-
-
+### this is the second part of what is replacing the parsePeptideFileUsingTwoPeptideRule function. I don't understand really anything of this script's inner ...
+### ... workings but I think it's just about parsimony. 
 
 def parsimonous_protein_identification(peptides):
     """
@@ -111,11 +114,28 @@ if __name__ == '__main__':
     if len(sys.argv) < 2:
         print "Usage: parsimony.py <name of percolator xml output file>"
         sys.exit(1)
-    per_xml_filename = sys.argv[1]
-    peptides = parse_percolator_txt(per_xml_filename)
+    per_filename = sys.argv[1]
+    peptides = parse_percolator_txt(per_filename)
     proteins = parsimonous_protein_identification(peptides)
     for protein, peptides in proteins.items():
         print "{}\t{}".format(protein, "\t".join(peptides))
 
+
+
+def runParsimony(filename, isDecoy):
+    peptides = parse_percolator_txt(filename)
+    proteins = parsimonous_protein_identification(peptides)
+    protein_list = [] 
+    #proteins = list(proteins)
+    for name, sequence in proteins.iteritems():
+        if isDecoy == True:
+            tup = (name, True)
+            protein_list.append(tup)
+        else:
+            tup = (name, False)
+            protein_list.append(tup)
+    return protein_list
+ 
+a= runParsimony(sys.argv[1], True) #and make this F for target
 
        

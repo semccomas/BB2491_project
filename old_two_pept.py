@@ -1,3 +1,42 @@
+## this is to figure out what to add to parsimony file and also to compare to the two peptide rule 
+
+
+import sys
+import numpy as np
+#f = open(sys.argv[1]).read().splitlines()
+
+# line[9] is q val
+# line[11] is peptide sequence
+# line[14] is peptide ID
+
+'''
+
+for line in f:
+	line = line.split('\t')
+	raw_input()
+	print line[14]
+
+
+with open(sys.argv[1], 'r') as f:
+    f= f.read().splitlines()
+    for line in f:
+        line = line.split('\t')
+        q_value_str = line[9]
+        pep_seq = line[11]
+        pep = line[14]
+        print pep, pep_seq, q_value_str
+#        raw_input()
+
+
+'''
+
+
+import subprocess
+import glob
+import sys
+import os
+import csv
+
 ## copied from iprg2016_two_peptide_rule.ipyn
 
 
@@ -71,6 +110,8 @@ def parsePeptieFileUsingTwoPeptidesRule(fileName, isDecoy):
 
 
 
+
+
 ### ok so here we take the decoy and the target files from each pool (A1, A2, etc). 
 ### VARIABLES: proteins, is the output from parsePeptieFileUsingTwoPeptidesRule(therefore proteinList).
 ############ fdr = this is the number of decoys divided by the number of targets. IF i understand this correctly, it is recalculated at each line as it loops through "proteins" ...
@@ -123,32 +164,6 @@ print spec_files, fastaFile
 
 
 
-## in [6]. This requires that crux is installed and also in your path of executable files. For this, I write " export PATH=$PATH:crux-3.0.Darwin.i386/bin " in the command ...
-### ... line each time I open a terminal. If you want it to be automatic, add it to your ~/.bashrc . I have crux in the same directory as this script but I don't think it's necessary to do that.
-
-
-subprocess.call(["crux", "tide-index", 
-      fastaFile, "prest-index"])
-
-for setN in setNames:
-    options = "--output-dir %s-output --overwrite T --compute-sp T --overwrite T --precursor-window 5.0 --precursor-window-type ppm" % setN  
-    tide_call = "crux tide-search %s %s.mzML prest-index" % (options,setN) 
-    print "Matching %s.mzML against the amino acid sequences."%(setN)
-    subprocess.check_output(tide_call,  shell=True)
-
-
-
-
-## in [7]. Here we call percolator, also from crux. At this point we have several subdirectories that will be spit out from crux output. I think it is "prest-index", "crux-output", and "mz_ml_files/*_output" 
-##So far we are only working with the mz_ml_files output (or whatever you named your directory with the mzml files in it).
-
-for setN in setNames:
-    print "Post processing %s\'s results."%(setN)
-    options = "--output-dir %s-output --overwrite T" % setN  
-    percolator_call = "crux percolator %s ./%s-output/tide-search.target.txt" % (options,setN)
-
-    subprocess.check_output(percolator_call, shell=True)
-
 
 
 
@@ -184,12 +199,14 @@ for setN in setNames:
             fdr = float(1.0)
         proteinRunDict[prot].append(fdr)
 
-#### so in parsimony we should be able to just add this part on, leave this part with the fdr equalling 1 if the value is not in the fasta file 
+##### DONT FORGET THAT HERE WE WONT NEED FDR. SO WE DONT NEED THIS FDR THING HERE 
+a = protFdrDict
+b = proteinRunDict
+
+'''
 
 
-
-
-## in [9]. Just write the results and add a description row on top 
+## in [9]. Just write the results and add a top column. 
 
 
 with open("my_resultFile.txt","w") as outFile:
@@ -199,3 +216,4 @@ with open("my_resultFile.txt","w") as outFile:
         csvWriter.writerow([prot]+proteinRunDict[prot])
     outFile.close()
 
+'''

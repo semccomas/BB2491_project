@@ -1,5 +1,5 @@
 ## copied from iprg2016_two_peptide_rule.ipyn
-
+### subsequently copied from changed_example_soln.py and adding parsimony.py. Using this script to make actual changes and mess some things up 
 
 ### all imports copied here.
 
@@ -27,8 +27,6 @@ def getAllProteinNames(fastaFile):
     return proteinNames
 
 #import csv
-
-
 
 
 
@@ -69,6 +67,141 @@ def parsePeptieFileUsingTwoPeptidesRule(fileName, isDecoy):
     return proteinList
 
 
+######## NOW WE ARE ADDING PARSIMONY HERE!!!!!!!!!!!!!!!!!! 
+
+
+# parsimony.py - takes percolator xml output file and outputs parsimonous
+#                protein identifications with peptide matches
+#
+
+
+from pygraph.classes.graph import graph
+from pygraph.algorithms.accessibility import connected_components
+from itertools import combinations, chain
+import sys
+
+# Outputs the identified proteins identified using parsimony. If a pair of 
+# equally sized sets of proteins both cover all peptides in their group, the 
+# set that matched first is returned.
+#
+# This program assumes that the input percolator results XML validates.
+#
+# Tab-delimited output format: 
+# <protein name>\t<peptide 1>\t...\t<peptide N>
+
+
+fastaFile = "iPRG2016.fasta"  
+
+### so now this will parse the file the same way as the two peptide rule. Filename here is sys. This should be changed to be in [8] as setN and the %s thing. This is the ...
+### ... first part of the parsePeptideFileUsingTwoPeptideRule function (attributing values to variables and reading the file). 
+### VARIABLES: peptides. A dictionary of the sequence attached to the protein name for each file. I think maybe later we will change this to the q value score so that it is matching ...
+### .. the script with two peptide rule. 
+
+def parse_percolator_txt(filename, q_value_cutoff= 0.01):
+    with open(filename, 'r') as f:
+        f= f.read().splitlines()
+        peptides= {}
+        for line in f[1:]:
+            line = line.split('\t')
+            q_value_str = line[9]
+            pep_seq = line[11]
+            protein_str = line[13]
+            try:
+                q_value = float(q_value_str)
+            except ValueError:
+                raise ValueError("Invalid q value {}".format(q_value_str))
+            if pep_seq in peptides:
+                raise RuntimeError("Duplicate peptide in percolator xml output")
+            if q_value > q_value_cutoff:
+                pass
+            protein_ids = protein_str.split(',')
+            peptides[pep_seq] = protein_ids
+        return peptides
+
+
+### this is the second part of what is replacing the parsePeptideFileUsingTwoPeptideRule function. I don't understand really anything of this script's inner ...
+### ... workings but I think it's just about parsimony. 
+
+def parsimonous_protein_identification(peptides):
+    """
+    parsimonous_protein_identification - takes a dict of the form
+        {<peptide_seq>: <protein_name>, [<protein_na,e> ...] } and returns the 
+        proteins identified using parsimony.
+    """
+    detected_proteins = {}
+    protein2peptides = {}
+
+    # start with the uniquely determined proteins
+    for peptide, proteins in peptides.items():
+        if len(proteins) == 1:
+            detected_proteins[proteins[0]] = [peptide]
+            peptides.pop(peptide)
+        else:
+            for p in proteins:
+                if not p in protein2peptides:
+                    protein2peptides[p] = [peptide]
+                else:
+                    protein2peptides[p].append(peptide)
+
+    # remaining peptides have multiple potential proteins, use parsimony
+    g = graph()
+
+    # identify protein clusters
+    for peptide, proteins in peptides.items():
+        for protein in proteins:
+            if not g.has_node(protein):
+                g.add_node(protein)
+        for p1, p2 in combinations(proteins, 2):
+            if not g.has_edge((p1, p2)):
+                g.add_edge((p1, p2))
+    connected = connected_components(g).items()
+    clusters = {subgraph: set() for protein, subgraph in connected}
+    for protein, subgraph in connected:
+        clusters[subgraph] = clusters[subgraph].union(set((protein,)))
+
+    def find_covering(proteins):
+        peptides = set(chain(*(tuple(protein2peptides[p]) for p in proteins)))
+        for k in range(1, len(proteins) + 1):
+            for covering in combinations(proteins, k):
+                covered = set(chain(*(tuple(protein2peptides[p]) for p in 
+                    covering)))
+                if len(covered) == len(peptides):
+                    return covering
+        return None
+
+    # find the minimal protein covering of each cluster
+    for cluster in clusters.values():
+        covering = find_covering(cluster)
+        if covering is None:
+            print "Error, failed to cover " + str(subgraph)
+            sys.exit(1)
+        else:
+            for protein in covering:
+                detected_proteins[protein] = protein2peptides[protein]
+
+    return detected_proteins
+
+
+#### so what we are doing here is making a function to run the actual 2 functions from parsimony, as the for loop above does
+#### this we will put into getProteinWithFDR. 
+### returns the same thing as the last bit in the parsimony.py script, just now in function form with added True and False.
+def runParsimony(filename, isDecoy):
+    peptides = parse_percolator_txt(filename)
+    proteins = parsimonous_protein_identification(peptides)
+    protein_list = [] 
+    for name, seq in proteins.iteritems():
+        if isDecoy:
+            tup = (name, True)
+            protein_list.append(tup)
+        else:
+            tup = (name, False)
+            protein_list.append(tup)
+    return protein_list
+
+
+  
+
+
 
 
 ### ok so here we take the decoy and the target files from each pool (A1, A2, etc). 
@@ -80,16 +213,28 @@ def parsePeptieFileUsingTwoPeptidesRule(fileName, isDecoy):
 ########### ... example:   'CAQ33735': 0.0,   'CAQ33734': 0.16252390057361377,    'HPRR4340063': 0.3311897106109325,    'HPRR1450141': 0.0,    
 ############ order and q are protein names and some number in the function, I don't totally understand their purpose. I'm thinking something about a q value threshold.
 
-##in [3]. Will call this in 8 below but we should also change this to take away the FDR part and also adapt it to the parsimony. 
+##in [3]. Will call this in 8 below but we should also change this to take away the FDR part and also adapt it to the parsimony.
+### HERE something is wrong. 
+
+### ideas - compare the two outputs from parsePeptieFileUsingTwoPeptidesRule and runParsimony. Where do they differ? We are getting same 
+### FDR calc for all vals on runParsimony so something is off on the FDR calc. Number of peptides listed is pretty normal, we just are missing some form of calculation here
+### or maybe even in the setN in setNames part. But problem is we don't have a way to calculate FDR otherwise. How does parsimony do this?
+##### HEY DUMMY MAYBE CAUSE YOU ARE USING THE Q VALUE AND THAT IS THE FDR RIGHT? SO THEN YOU SHOULD JUST ADD THAT TO THE OUTPUT FROM RUNPARSIMONY
+##### AND THAT SHOULD BE INCLUDED IN THE FDR HERE IN GETPROTEINWITHFDR AND JUST DELETE THE OLD WAY OF CALCULATING IT. 
+
+
+
 def getProteinWithFDR(targetFile,decoyFile):
-    proteins = parsePeptieFileUsingTwoPeptidesRule(targetFile,False)
-    proteins += parsePeptieFileUsingTwoPeptidesRule(decoyFile,True)
+   # proteins = parsePeptieFileUsingTwoPeptidesRule(targetFile,False)
+   # proteins += parsePeptieFileUsingTwoPeptidesRule(decoyFile,True)
+    proteins = runParsimony(targetFile, False)
+    proteins += runParsimony(decoyFile, True)
     proteins.sort(reverse=True, key=lambda prot_tupple: prot_tupple[0])
     protFdrDict = dict()
     targets,decoys = 0,0
     order = []
     search = True
-    for score,isDecoy,prot in proteins:
+    for prot, isDecoy in proteins:
         if isDecoy:
             decoys += 1
         else:
@@ -106,7 +251,7 @@ def getProteinWithFDR(targetFile,decoyFile):
     for prot in order:
         q = min(q,protFdrDict[prot])
         protFdrDict[prot] = q
-    return protFdrDict
+    return protFdrDict, decoys, targets 
 
 ## skip in [4] because it was converting to mzml format. Already done.
 
@@ -126,7 +271,7 @@ print spec_files, fastaFile
 ## in [6]. This requires that crux is installed and also in your path of executable files. For this, I write " export PATH=$PATH:crux-3.0.Darwin.i386/bin " in the command ...
 ### ... line each time I open a terminal. If you want it to be automatic, add it to your ~/.bashrc . I have crux in the same directory as this script but I don't think it's necessary to do that.
 
-
+'''
 subprocess.call(["crux", "tide-index", 
       fastaFile, "prest-index"])
 
@@ -152,7 +297,7 @@ for setN in setNames:
 
 
 
-
+'''
 
 ## in [8]    as it says below in the comment, only report back prEST frags from the fasta file. This is where you call the function from [1]
 proteinRunDict = dict()
@@ -173,6 +318,12 @@ for prot in getAllProteinNames(fastaFile):
 ##### if it is, assign the fdr number that was already attached to it (i.e if you use the example above, HPRR1951262 it will get the number 0.6462459695992631)
 ###### if it is NOT, give it the fdr number of 1. So this means our assumption before of the 0's and the 1's in the result file is backwards. A value of 0 means it's there, a value of 1 means ...
 ###### ... that is is not there, or that the fdr is 100% 
+##########################################################################
+#########################################################################
+### ALSO THINK OF THE FACT THAT THINGS ARE NAMED DECOY HELLO!!!!!!!! 
+#########################################################################
+#######################################################################
+'''
 for setN in setNames:
     print "Parsing %s\'s results."%(setN)
     protFdrDict = getProteinWithFDR("%s-output/percolator.target.peptides.txt"%(setN),
@@ -184,13 +335,18 @@ for setN in setNames:
             fdr = float(1.0)
         proteinRunDict[prot].append(fdr)
 
-#### so in parsimony we should be able to just add this part on, leave this part with the fdr equalling 1 if the value is not in the fasta file 
 
+'''
 
+for setN in setNames:
+    print getProteinWithFDR("%s-output/percolator.target.peptides.txt"%(setN),
+                    "%s-output/percolator.decoy.peptides.txt"%(setN))
 
+#above just tests some things out you can delet this
+
+'''
 
 ## in [9]. Just write the results and add a description row on top 
-
 
 with open("my_resultFile.txt","w") as outFile:
     csvWriter = csv.writer(outFile, delimiter = '\t',quotechar='"', quoting=csv.QUOTE_NONNUMERIC)
@@ -198,4 +354,8 @@ with open("my_resultFile.txt","w") as outFile:
     for prot in proteinRunDict:
         csvWriter.writerow([prot]+proteinRunDict[prot])
     outFile.close()
+
+'''
+
+
 
