@@ -8,7 +8,9 @@ import glob
 import sys
 import os
 import csv
-
+from pygraph.classes.graph import graph
+from pygraph.algorithms.accessibility import connected_components
+from itertools import combinations, chain
 
 
 ### in [1]. This is just parsing the fasta file. We will call this function in [8] below. 
@@ -26,13 +28,12 @@ def getAllProteinNames(fastaFile):
                 proteinNames.append(words[0])
     return proteinNames
 
-#import csv
 
 
 
 
-
-## in [2]. This is the two peptide rule. We call this function in [3] below.
+## in [2]. This is the two peptide rule. We call this function in [3] below. Even though we are using parsimony, it does not hurt to leave this function here, ...
+### ... I never end up calling it at any point. It's good to be able to compare the output so that we know we didn't fuck up along the way. 
 
 ## VARIABLES HERE: fileName = the name of the file in the percolator output files. Specified in [5] EX: for me it is study_package/mz_ml_files/A1-output/percolator.target.peptides.txt.
 ###### isDecoy = either True or False depending on if its A1-output/percolator.decoy.peptides.txt or percolator.target.peptides.txt. 
@@ -75,24 +76,16 @@ def parsePeptieFileUsingTwoPeptidesRule(fileName, isDecoy):
 #
 
 
-from pygraph.classes.graph import graph
-from pygraph.algorithms.accessibility import connected_components
-from itertools import combinations, chain
-import sys
 
 # Outputs the identified proteins identified using parsimony. If a pair of 
 # equally sized sets of proteins both cover all peptides in their group, the 
 # set that matched first is returned.
 #
-# This program assumes that the input percolator results XML validates.
-#
 # Tab-delimited output format: 
 # <protein name>\t<peptide 1>\t...\t<peptide N>
 
 
-fastaFile = "iPRG2016.fasta"  
-
-### so now this will parse the file the same way as the two peptide rule. Filename here is sys. This should be changed to be in [8] as setN and the %s thing. This is the ...
+### so now this will parse the file the same way as the two peptide rule. Filename here is setN in setNames, (see [8]) aka the percolator.decoy or .target. This should be changed to be in [8] as setN and the %s thing. This is the ...
 ### ... first part of the parsePeptideFileUsingTwoPeptideRule function (attributing values to variables and reading the file). 
 ### VARIABLES: peptides. A dictionary of the sequence attached to the protein name for each file. I think maybe later we will change this to the q value score so that it is matching ...
 ### .. the script with two peptide rule. 
@@ -182,9 +175,10 @@ def parsimonous_protein_identification(peptides):
     return detected_proteins
 
 
-#### so what we are doing here is making a function to run the actual 2 functions from parsimony, as the for loop above does
+#### so what we are doing here is making a function to run the actual 2 functions from parsimony.
 #### this we will put into getProteinWithFDR. 
-### returns the same thing as the last bit in the parsimony.py script, just now in function form with added True and False.
+### returns the same thing as the last bit in the parsimony.py script, just now in function form with added True and False. I think we won't ...
+### ... end up needing the True or False in the file, since we will change how to FDR works but i am not sure yet.... 
 def runParsimony(filename, isDecoy):
     peptides = parse_percolator_txt(filename)
     proteins = parsimonous_protein_identification(peptides)
@@ -203,6 +197,7 @@ def runParsimony(filename, isDecoy):
 
 
 
+##in [3]. Will call this function in 8 below but we should also change this to take away the FDR part and also adapt it to the parsimony.
 
 ### ok so here we take the decoy and the target files from each pool (A1, A2, etc). 
 ### VARIABLES: proteins, is the output from parsePeptieFileUsingTwoPeptidesRule(therefore proteinList).
@@ -213,15 +208,15 @@ def runParsimony(filename, isDecoy):
 ########### ... example:   'CAQ33735': 0.0,   'CAQ33734': 0.16252390057361377,    'HPRR4340063': 0.3311897106109325,    'HPRR1450141': 0.0,    
 ############ order and q are protein names and some number in the function, I don't totally understand their purpose. I'm thinking something about a q value threshold.
 
-##in [3]. Will call this function in 8 below but we should also change this to take away the FDR part and also adapt it to the parsimony.
-### HERE something is wrong. 
 
-### ideas - compare the two outputs from parsePeptieFileUsingTwoPeptidesRule and runParsimony. Where do they differ? We are getting same 
-### FDR calc for all vals on runParsimony so something is off on the FDR calc. Number of peptides listed is pretty normal, we just are missing some form of calculation here
+
+### ideas 18 December- compare the two outputs from parsePeptieFileUsingTwoPeptidesRule and runParsimony. Where do they differ? We are getting same ...
+### ... FDR calc for all vals on runParsimony so something is off on the FDR calc. Number of peptides listed is pretty normal, we just are missing some form of calculation here
 ### or maybe even in the setN in setNames part. But problem is we don't have a way to calculate FDR otherwise. How does parsimony do this? Are we supposed to be adding the q value
 ### back in? 
 
-
+#### UPDATE 20 December. As of right now, this is still definitely the part in the script that I think needs fixing. The problem is that we get the ...
+##### ... same FDR number for each set (i.e. in row A2, they are all 0.02323534345 or something.) So obviously that needs fixing. Maybe we are supposed to incorporate that indiv q value
 
 def getProteinWithFDR(targetFile,decoyFile):
    # proteins = parsePeptieFileUsingTwoPeptidesRule(targetFile,False)
@@ -269,6 +264,8 @@ print spec_files, fastaFile
 
 ## in [6]. This requires that crux is installed and also in your path of executable files. For this, I write " export PATH=$PATH:crux-3.0.Darwin.i386/bin " in the command ...
 ### ... line each time I open a terminal. If you want it to be automatic, add it to your ~/.bashrc . I have crux in the same directory as this script but I don't think it's necessary to do that.
+### UPDATE 20 December. I have these two parts commented out right now because I have already run crux once so I don't need to wait for it to run while I already can work with the output files
+### if you want to run it with crux, take away the    '''   below and after the subprocess.call bits.   
 
 '''
 subprocess.call(["crux", "tide-index", 
@@ -293,10 +290,10 @@ for setN in setNames:
 
     subprocess.check_output(percolator_call, shell=True)
 
-
-
-
 '''
+
+
+
 
 ## in [8]    as it says below in the comment, only report back prEST frags from the fasta file. This is where you call the function from [1]
 proteinRunDict = dict()
