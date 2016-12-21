@@ -213,14 +213,13 @@ def runParsimony(filename, isDecoy):
 ########### ... example:   'CAQ33735': 0.0,   'CAQ33734': 0.16252390057361377,    'HPRR4340063': 0.3311897106109325,    'HPRR1450141': 0.0,    
 ############ order and q are protein names and some number in the function, I don't totally understand their purpose. I'm thinking something about a q value threshold.
 
-##in [3]. Will call this in 8 below but we should also change this to take away the FDR part and also adapt it to the parsimony.
+##in [3]. Will call this function in 8 below but we should also change this to take away the FDR part and also adapt it to the parsimony.
 ### HERE something is wrong. 
 
 ### ideas - compare the two outputs from parsePeptieFileUsingTwoPeptidesRule and runParsimony. Where do they differ? We are getting same 
 ### FDR calc for all vals on runParsimony so something is off on the FDR calc. Number of peptides listed is pretty normal, we just are missing some form of calculation here
-### or maybe even in the setN in setNames part. But problem is we don't have a way to calculate FDR otherwise. How does parsimony do this?
-##### HEY DUMMY MAYBE CAUSE YOU ARE USING THE Q VALUE AND THAT IS THE FDR RIGHT? SO THEN YOU SHOULD JUST ADD THAT TO THE OUTPUT FROM RUNPARSIMONY
-##### AND THAT SHOULD BE INCLUDED IN THE FDR HERE IN GETPROTEINWITHFDR AND JUST DELETE THE OLD WAY OF CALCULATING IT. 
+### or maybe even in the setN in setNames part. But problem is we don't have a way to calculate FDR otherwise. How does parsimony do this? Are we supposed to be adding the q value
+### back in? 
 
 
 
@@ -251,7 +250,7 @@ def getProteinWithFDR(targetFile,decoyFile):
     for prot in order:
         q = min(q,protFdrDict[prot])
         protFdrDict[prot] = q
-    return protFdrDict, decoys, targets 
+    return protFdrDict
 
 ## skip in [4] because it was converting to mzml format. Already done.
 
@@ -318,12 +317,8 @@ for prot in getAllProteinNames(fastaFile):
 ##### if it is, assign the fdr number that was already attached to it (i.e if you use the example above, HPRR1951262 it will get the number 0.6462459695992631)
 ###### if it is NOT, give it the fdr number of 1. So this means our assumption before of the 0's and the 1's in the result file is backwards. A value of 0 means it's there, a value of 1 means ...
 ###### ... that is is not there, or that the fdr is 100% 
-##########################################################################
-#########################################################################
-### ALSO THINK OF THE FACT THAT THINGS ARE NAMED DECOY HELLO!!!!!!!! 
-#########################################################################
-#######################################################################
-'''
+
+
 for setN in setNames:
     print "Parsing %s\'s results."%(setN)
     protFdrDict = getProteinWithFDR("%s-output/percolator.target.peptides.txt"%(setN),
@@ -336,26 +331,18 @@ for setN in setNames:
         proteinRunDict[prot].append(fdr)
 
 
-'''
 
-for setN in setNames:
-    print getProteinWithFDR("%s-output/percolator.target.peptides.txt"%(setN),
-                    "%s-output/percolator.decoy.peptides.txt"%(setN))
-
-#above just tests some things out you can delet this
-
-'''
 
 ## in [9]. Just write the results and add a description row on top 
 
-with open("my_resultFile.txt","w") as outFile:
+with open("my_resultFile2.txt","w") as outFile:
     csvWriter = csv.writer(outFile, delimiter = '\t',quotechar='"', quoting=csv.QUOTE_NONNUMERIC)
     csvWriter.writerow(["FDR"]+setNames)
     for prot in proteinRunDict:
         csvWriter.writerow([prot]+proteinRunDict[prot])
     outFile.close()
 
-'''
+
 
 
 
