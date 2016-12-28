@@ -42,7 +42,8 @@ def getAllProteinNames(fastaFile):
 
 ## so this we will replace with the parsimony. I THINK the only thing we need to change is the FDR, otherwise they act the same (ie. both take as input only one file, either the target or the decoy)...
 ## ... and it will need to have the same output, proteinList (explained above)
-## I will explain in [8] how they loop through the percolator.target and percolator.decoy files to get these outputs. 
+## I will explain in [8] how they loop through the percolator.target and percolator.decoy files to get these outputs.
+''' 
 def parsePeptieFileUsingTwoPeptidesRule(fileName, isDecoy):
     with open(fileName, "r") as fileIter:
         tabReader = csv.reader(fileIter,doublequote = False, delimiter = '\t')
@@ -67,6 +68,7 @@ def parsePeptieFileUsingTwoPeptidesRule(fileName, isDecoy):
             proteinList.append((proteinDict[prot],isDecoy,prot))
     return proteinList
 
+'''
 
 ######## NOW WE ARE ADDING PARSIMONY HERE!!!!!!!!!!!!!!!!!! 
 
@@ -179,6 +181,8 @@ def parsimonous_protein_identification(peptides):
 #### this we will put into getProteinWithFDR. 
 ### returns the same thing as the last bit in the parsimony.py script, just now in function form with added True and False. I think we won't ...
 ### ... end up needing the True or False in the file, since we will change how to FDR works but i am not sure yet.... 
+'''
+## THIS IS THE OLD ONE!! DONT USE!!
 def runParsimony(filename, isDecoy):
     peptides = parse_percolator_txt(filename)
     proteins = parsimonous_protein_identification(peptides)
@@ -192,6 +196,33 @@ def runParsimony(filename, isDecoy):
             protein_list.append(tup)
     return protein_list
 
+'''
+
+def runParsimony(filename):
+    peptides = parse_percolator_txt(filename)
+    proteins = parsimonous_protein_identification(peptides)
+    ## proteins puts out name, sequence 
+
+    f = open(filename).read().splitlines()
+    q_and_name = []
+    for line in f[1:]:
+        line = line.split('\t')
+        q_value_str = float(line[9])
+        protein_seq = line[11] 
+        tup = (q_value_str, protein_seq)
+        q_and_name.append(tup)         
+    ### q_and_name is the q value and the sequence. We use the sequence because it's statistically speaking only going to be present in the 
+    ## percolator output files once, whereas you see the protein name more often (therefore you wouldnt know which protein the parsimony is choosing
+    ## and maybe assign the incorrect q value.) The protein_list is the same size as the proteins 
+
+    protein_list = [] 
+    for line in proteins.iteritems():
+        for seq in q_and_name:
+            if seq[1] in line[1]:
+                tup = (line[0], seq[0])
+                protein_list.append(tup)
+            #protein_list[line[0]] = seq[0]
+    return protein_list
 
   
 
@@ -218,33 +249,35 @@ def runParsimony(filename, isDecoy):
 #### UPDATE 20 December. As of right now, this is still definitely the part in the script that I think needs fixing. The problem is that we get the ...
 ##### ... same FDR number for each set (i.e. in row A2, they are all 0.02323534345 or something.) So obviously that needs fixing. Maybe we are supposed to incorporate that indiv q value
 
+### UPDATE 27 December, nothing really going on with the decoy but at least we have some q val
+
 def getProteinWithFDR(targetFile,decoyFile):
-   # proteins = parsePeptieFileUsingTwoPeptidesRule(targetFile,False)
-   # proteins += parsePeptieFileUsingTwoPeptidesRule(decoyFile,True)
-    proteins = runParsimony(targetFile, False)
-    proteins += runParsimony(decoyFile, True)
+    proteins = runParsimony(targetFile)
+    proteins += runParsimony(decoyFile)
     proteins.sort(reverse=True, key=lambda prot_tupple: prot_tupple[0])
     protFdrDict = dict()
-    targets,decoys = 0,0
+    #targets,decoys = 0,0
     order = []
-    search = True
-    for prot, isDecoy in proteins:
-        if isDecoy:
-            decoys += 1
-        else:
-            targets += 1
-            fdr = decoys/float(targets)
-            protFdrDict[prot] = fdr
-            order.append(prot)
-            if (search and fdr>0.01):
-                print "Found %d proteins at FDR %f"%(targets,fdr)
-                search = False
-    order.reverse()
+   # search = True
+    for prot, qval in proteins:
+        #if isDecoy:
+         #   decoys += 1
+       # else:
+        #    targets += 1
+            #fdr = qval #decoys/float(targets)
+            if qval > 0.0:
+                protFdrDict[prot] = qval
+                #order.append(prot)
+           # if (search and fdr>0.01):
+                #print "Found %d proteins at FDR %f"%(targets,fdr)
+            #    pass
+            #    search = False
+    #order.reverse()
     # Set the q value to be the minimal FDR that includes the current protein
-    q=1.0
-    for prot in order:
-        q = min(q,protFdrDict[prot])
-        protFdrDict[prot] = q
+    #q=1.0
+    #for prot in order:
+     #   q = min(q,protFdrDict[prot])
+      #  protFdrDict[prot] = q
     return protFdrDict
 
 ## skip in [4] because it was converting to mzml format. Already done.

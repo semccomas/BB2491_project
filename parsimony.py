@@ -110,23 +110,50 @@ def parsimonous_protein_identification(peptides):
 
     return detected_proteins
 
-if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print "Usage: parsimony.py <name of percolator xml output file>"
-        sys.exit(1)
-    per_filename = sys.argv[1]
-    peptides = parse_percolator_txt(per_filename)
-    proteins = parsimonous_protein_identification(peptides)
-    for protein, peptides in proteins.items():
-        print "{}\t{}".format(protein, "\t".join(peptides))
+'''
+    for name, seq in proteins.iteritems():
+        for line in q_and_name:
+            if line[0] == seq:
+                print line
 
+'''
 
-
-def runParsimony(filename, isDecoy):
+def runParsimony(filename):
     peptides = parse_percolator_txt(filename)
     proteins = parsimonous_protein_identification(peptides)
-    protein_list = [] 
-    #proteins = list(proteins)
+    ## proteins puts out name, sequence 
+
+    f = open(filename).read().splitlines()
+    q_and_name = []
+    for line in f[1:]:
+        line = line.split('\t')
+        q_value_str = float(line[9])
+        protein_seq = line[11] 
+        tup = (q_value_str, protein_seq)
+        q_and_name.append(tup)         
+    ### q_and_name is the q value and the sequence. We use the sequence because it's statistically speaking only going to be present in the 
+    ## percolator output files once, whereas you see the protein name more often (therefore you wouldnt know which protein the parsimony is choosing
+    ## and maybe assign the incorrect q value.) The protein_list is the same size as the proteins 
+
+    protein_list = []
+    for line in proteins.iteritems():
+        for seq in q_and_name:
+            if seq[1] in line[1]:
+                tup = (line[0], seq[0])
+                #protein_list[line[0]] = seq[0]
+                protein_list.append(tup)
+    return protein_list
+
+
+
+
+ 
+a= runParsimony(sys.argv[1]) #and make this F for target
+print a
+# not gonna matter if decoy or no because you then don't have to divide anything 
+
+
+'''
     for name, sequence in proteins.iteritems():
         if isDecoy == True:
             tup = (name, True)
@@ -135,7 +162,20 @@ def runParsimony(filename, isDecoy):
             tup = (name, False)
             protein_list.append(tup)
     return protein_list
- 
-a= runParsimony(sys.argv[1], True) #and make this F for target
 
+
+l = 0
+if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        print "Usage: parsimony.py <name of percolator xml output file>"
+        sys.exit(1)
+    per_xml_filename = sys.argv[1]
+    peptides = parse_percolator_txt(per_xml_filename)
+    proteins = parsimonous_protein_identification(peptides)
+    for protein, peptides in proteins.items():
+        print "{}\t{}".format(protein, "\t".join(peptides))
+        l = l + 1
+print l
+
+'''
        
